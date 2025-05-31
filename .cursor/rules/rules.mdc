@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+try to keep file sizes small unless writing a test script or a quick proof of concept
+
