@@ -9,6 +9,9 @@
 	let error = '';
 	let totalCost = 0;
 	let usingFallbackData = false;
+	let debugModalOpen = false;
+	let debugData: any = null;
+	let rawApiResults: any[] = [];
 
 	// Calculate total cost whenever selectedItems changes
 	$: totalCost = selectedItems.reduce((sum, item) => sum + item.cost * item.quantity, 0);
@@ -19,6 +22,7 @@
 		isLoading = true;
 		error = '';
 		usingFallbackData = false;
+		rawApiResults = [];
 
 		try {
 			const response = await fetch(
@@ -32,6 +36,9 @@
 			const data = await response.json();
 
 			if (data.success && data.data && data.data.results) {
+				// Store raw API results for debugging
+				rawApiResults = data.data.results;
+
 				// Transform API results to match our interface
 				searchResults = data.data.results.map((item: any) => ({
 					id: item.id,
@@ -110,6 +117,28 @@
 	function handleKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter') {
 			searchItems();
+		}
+	}
+
+	function openDebugModal(index: number) {
+		if (usingFallbackData) {
+			// For fallback data, show the transformed result
+			debugData = searchResults[index];
+		} else {
+			// For API data, show the raw API response
+			debugData = rawApiResults[index] || searchResults[index];
+		}
+		debugModalOpen = true;
+	}
+
+	function closeDebugModal() {
+		debugModalOpen = false;
+		debugData = null;
+	}
+
+	function copyToClipboard() {
+		if (debugData) {
+			navigator.clipboard.writeText(JSON.stringify(debugData, null, 2));
 		}
 	}
 </script>
@@ -191,13 +220,22 @@
 					</div>
 				{:else}
 					<div class="space-y-3">
-						{#each searchResults as item}
+						{#each searchResults as item, index}
 							<div class="rounded-lg border border-gray-200 p-4 transition-shadow hover:shadow-md">
 								<div class="mb-2 flex items-start justify-between">
-									<h3 class="font-medium text-gray-800">{item.name}</h3>
-									<span class="rounded bg-blue-100 px-2 py-1 text-sm text-blue-800">
-										{item.category || 'General'}
-									</span>
+									<h3 class="flex-1 pr-2 font-medium text-gray-800">{item.name}</h3>
+									<div class="flex items-center gap-2">
+										<span class="rounded bg-blue-100 px-2 py-1 text-sm text-blue-800">
+											{item.category || 'General'}
+										</span>
+										<button
+											on:click={() => openDebugModal(index)}
+											class="rounded bg-gray-100 px-2 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-200"
+											title="Show raw JSON data"
+										>
+											🐛 Debug
+										</button>
+									</div>
 								</div>
 								{#if item.description}
 									<p class="mb-3 line-clamp-2 text-sm text-gray-600">{item.description}</p>
@@ -308,6 +346,39 @@
 		</div>
 	</div>
 </div>
+
+<!-- Debug Modal -->
+{#if debugModalOpen}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+		<div class="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-lg bg-white shadow-xl">
+			<div class="flex items-center justify-between border-b border-gray-200 p-4">
+				<h3 class="text-lg font-semibold text-gray-800">
+					Raw JSON Data {usingFallbackData ? '(Sample Data)' : '(API Response)'}
+				</h3>
+				<div class="flex gap-2">
+					<button
+						on:click={copyToClipboard}
+						class="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+						title="Copy to clipboard"
+					>
+						📋 Copy
+					</button>
+					<button
+						on:click={closeDebugModal}
+						class="rounded bg-gray-500 px-3 py-1 text-sm text-white hover:bg-gray-600"
+					>
+						✕ Close
+					</button>
+				</div>
+			</div>
+			<div class="overflow-auto p-4" style="max-height: calc(90vh - 80px);">
+				<pre class="overflow-x-auto rounded border bg-gray-50 p-4 text-xs text-gray-800"><code
+						>{JSON.stringify(debugData, null, 2)}</code
+					></pre>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	@media print {
